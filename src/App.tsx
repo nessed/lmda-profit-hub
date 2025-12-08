@@ -4,13 +4,17 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ManagerRoute } from "@/components/auth/ManagerRoute";
+import { EmployeeRoute } from "@/components/auth/EmployeeRoute";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import Dashboard from "./pages/Dashboard";
 import Workshops from "./pages/Workshops";
 import WorkshopDetail from "./pages/WorkshopDetail";
+import EmployeeSetup from "./pages/employee/Setup";
+import StaffLogs from "./pages/StaffLogs";
 import NotFound from "./pages/NotFound";
+import AuthRedirect from "./pages/AuthRedirect";
 
 const queryClient = new QueryClient();
 
@@ -26,25 +30,37 @@ const App = () => (
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/signup" element={<Signup />} />
             
-            {/* Protected routes */}
+            {/* Role-based redirect */}
+            <Route path="/" element={<AuthRedirect />} />
+            
+            {/* Manager routes */}
             <Route path="/dashboard" element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <Dashboard />
-              </ProtectedRoute>
+              </ManagerRoute>
             } />
             <Route path="/workshops" element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <Workshops />
-              </ProtectedRoute>
+              </ManagerRoute>
             } />
             <Route path="/workshops/:id" element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <WorkshopDetail />
-              </ProtectedRoute>
+              </ManagerRoute>
+            } />
+            <Route path="/staff-logs" element={
+              <ManagerRoute>
+                <StaffLogs />
+              </ManagerRoute>
             } />
             
-            {/* Redirects */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            {/* Employee routes */}
+            <Route path="/employee/setup" element={
+              <EmployeeRoute>
+                <EmployeeSetup />
+              </EmployeeRoute>
+            } />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
