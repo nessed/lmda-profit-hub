@@ -1,14 +1,29 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageLayout } from '@/components/layout/PageLayout';
-import { KPICard } from '@/components/ui/KPICard';
-import { StatusPill } from '@/components/ui/StatusPill';
-import { getWorkshops, getRegistrations, isPaid, formatCurrency, formatDate, Workshop, Registration } from '@/lib/api';
-import { ChevronRight } from 'lucide-react';
+import { 
+  getWorkshops, 
+  getRegistrations, 
+  getFinancialSnapshots,
+  isPaid, 
+  formatCurrency, 
+  formatDate, 
+  Workshop, 
+  Registration,
+  FinancialSnapshot 
+} from '@/lib/api';
+import { cn } from '@/lib/utils';
+
+interface WorkshopWithData extends Workshop {
+  registrations: Registration[];
+  latestSnapshot: FinancialSnapshot | null;
+  revenue: number;
+  profit: number;
+  profitMargin: number;
+}
 
 export default function Dashboard() {
-  const [workshops, setWorkshops] = useState<Workshop[]>([]);
-  const [registrationData, setRegistrationData] = useState<Record<string, Registration[]>>({});
+  const [workshopsData, setWorkshopsData] = useState<WorkshopWithData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,18 +32,35 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const workshopsData = await getWorkshops();
-      setWorkshops(workshopsData);
+      const workshops = await getWorkshops();
       
-      // Load registrations for each workshop
-      const regData: Record<string, Registration[]> = {};
-      await Promise.all(
-        workshopsData.map(async (w) => {
-          const regs = await getRegistrations(w.id);
-          regData[w.id] = regs;
+      const enriched = await Promise.all(
+        workshops.map(async (w) => {
+          const [regs, snaps] = await Promise.all([
+            getRegistrations(w.id),
+            getFinancialSnapshots(w.id),
+          ]);
+          
+          const revenue = regs
+            .filter(r => isPaid(r.payment_confirmed))
+            .reduce((sum, r) => sum + (r.amount_rs || 0), 0);
+          
+          const latestSnapshot = snaps[0] || null;
+          const profit = latestSnapshot?.profit ?? 0;
+          const profitMargin = latestSnapshot?.profit_margin ?? 0;
+          
+          return {
+            ...w,
+            registrations: regs,
+            latestSnapshot,
+            revenue,
+            profit,
+            profitMargin,
+          };
         })
       );
-      setRegistrationData(regData);
+      
+      setWorkshopsData(enriched);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -36,27 +68,36 @@ export default function Dashboard() {
     }
   }
 
-  // Calculate monthly stats
+  // Calculate total monthly profit
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
   
-  const allRegistrations = Object.values(registrationData).flat();
-  const thisMonthRegistrations = allRegistrations.filter(r => {
-    const date = new Date(r.created_at);
+  const thisMonthWorkshops = workshopsData.filter(w => {
+    const date = new Date(w.date);
     return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
   });
   
-  const totalRevenue = thisMonthRegistrations
-    .filter(r => isPaid(r.payment_confirmed))
-    .reduce((sum, r) => sum + (r.amount_rs || 0), 0);
+  const totalMonthlyProfit = thisMonthWorkshops.reduce((sum, w) => sum + w.profit, 0);
+  const totalMonthlyRevenue = thisMonthWorkshops.reduce((sum, w) => sum + w.revenue, 0);
   
-  const totalRegistrations = thisMonthRegistrations.length;
-  const paidRegistrations = thisMonthRegistrations.filter(r => isPaid(r.payment_confirmed)).length;
-  const pendingRegistrations = totalRegistrations - paidRegistrations;
+  // Next upcoming workshop
+  const upcomingWorkshops = workshopsData
+    .filter(w => new Date(w.date) >= now && w.status !== 'completed')
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const nextWorkshop = upcomingWorkshops[0];
 
-  // Active workshops (not completed)
-  const activeWorkshops = workshops.filter(w => w.status !== 'completed');
+  function getHealthClass(margin: number) {
+    if (margin >= 50) return 'health-dot-green';
+    if (margin >= 20) return 'health-dot-yellow';
+    return 'health-dot-red';
+  }
+
+  function getProfitCardClass(profit: number) {
+    if (profit > 0) return 'profit-card-positive';
+    if (profit < 0) return 'profit-card-negative';
+    return 'profit-card-neutral';
+  }
 
   if (loading) {
     return (
@@ -69,99 +110,111 @@ export default function Dashboard() {
   return (
     <PageLayout>
       <div className="space-y-8">
-        <header>
-          <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Overview of active workshops and revenue.</p>
+        {/* Header with Bank Account View */}
+        <header className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground uppercase tracking-wide">This Month's Profit</p>
+              <p className={cn(
+                "text-4xl sm:text-5xl font-bold tracking-tight",
+                totalMonthlyProfit >= 0 ? "text-success" : "text-destructive"
+              )}>
+                {formatCurrency(totalMonthlyProfit)}
+              </p>
+              {totalMonthlyRevenue > 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  from {formatCurrency(totalMonthlyRevenue)} revenue
+                </p>
+              )}
+            </div>
+            
+            {nextWorkshop && (
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Next Workshop</p>
+                <Link 
+                  to={`/workshops/${nextWorkshop.id}`}
+                  className="text-lg font-medium text-foreground hover:text-primary transition-colors"
+                >
+                  {nextWorkshop.title}
+                </Link>
+                <p className="text-sm text-muted-foreground">{formatDate(nextWorkshop.date)}</p>
+              </div>
+            )}
+          </div>
         </header>
 
-        {/* KPI Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <KPICard 
-            label="Revenue This Month" 
-            value={formatCurrency(totalRevenue)}
-          />
-          <KPICard 
-            label="Total Registrations" 
-            value={totalRegistrations}
-            subtext="This month"
-          />
-          <KPICard 
-            label="Paid Registrations" 
-            value={paidRegistrations}
-            subtext="This month"
-          />
-          <KPICard 
-            label="Pending Registrations" 
-            value={pendingRegistrations}
-            subtext="This month"
-          />
-        </div>
-
-        {/* Active Workshops */}
+        {/* Profit Grid */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="section-label mb-0">Active Workshops</h2>
+            <h2 className="section-label mb-0">Workshops</h2>
             <Link 
               to="/workshops" 
               className="text-sm text-primary hover:underline font-medium"
             >
-              View all
+              Manage
             </Link>
           </div>
           
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            {activeWorkshops.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground">
-                No active workshops. <Link to="/workshops" className="text-primary hover:underline">Create one</Link>
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {activeWorkshops.map((workshop) => {
-                  const regs = registrationData[workshop.id] || [];
-                  const paid = regs.filter(r => isPaid(r.payment_confirmed)).length;
-                  const revenue = regs
-                    .filter(r => isPaid(r.payment_confirmed))
-                    .reduce((sum, r) => sum + (r.amount_rs || 0), 0);
-                  
-                  return (
-                    <Link
-                      key={workshop.id}
-                      to={`/workshops/${workshop.id}`}
-                      className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors group"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-medium text-foreground truncate">
-                            {workshop.title}
-                          </h3>
-                          <StatusPill status={workshop.status} type="workshop" />
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {formatDate(workshop.date)}
-                        </p>
+          {workshopsData.length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <p className="text-muted-foreground">No workshops yet.</p>
+              <Link to="/workshops" className="text-primary hover:underline text-sm">
+                Create your first workshop
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {workshopsData.map((workshop) => (
+                <Link
+                  key={workshop.id}
+                  to={`/workshops/${workshop.id}`}
+                  className={cn(
+                    "profit-card group hover:scale-[1.02] transition-transform cursor-pointer",
+                    getProfitCardClass(workshop.profit)
+                  )}
+                >
+                  <div className="space-y-3">
+                    {/* Title & Date */}
+                    <div>
+                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                        {workshop.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(workshop.date)}
+                      </p>
+                    </div>
+                    
+                    {/* Net Profit - Hero Number */}
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-2xl sm:text-3xl font-bold",
+                        workshop.profit >= 0 ? "text-success" : "text-destructive"
+                      )}>
+                        {formatCurrency(workshop.profit)}
+                      </span>
+                      {workshop.latestSnapshot && (
+                        <span className={cn("health-dot", getHealthClass(workshop.profitMargin))} />
+                      )}
+                    </div>
+                    
+                    {/* Margin Bar */}
+                    <div className="space-y-1">
+                      <div className="margin-bar">
+                        <div 
+                          className="margin-bar-fill"
+                          style={{ width: `${Math.max(0, Math.min(100, workshop.profitMargin))}%` }}
+                        />
                       </div>
-                      
-                      <div className="flex items-center gap-6 text-right">
-                        <div className="hidden sm:block">
-                          <p className="text-sm font-medium text-foreground">
-                            {paid} / {regs.length}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Paid</p>
-                        </div>
-                        <div className="hidden sm:block">
-                          <p className="text-sm font-medium text-foreground">
-                            {formatCurrency(revenue)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Revenue</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Revenue: {formatCurrency(workshop.revenue)}</span>
+                        <span>{workshop.profitMargin.toFixed(0)}% margin</span>
                       </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </PageLayout>
