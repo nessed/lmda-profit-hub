@@ -1,10 +1,12 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, Users } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 export function Navbar() {
   const { user, signOut } = useAuth();
+  const { isManager } = useUserRole();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -21,7 +23,18 @@ export function Navbar() {
           </Link>
 
           {user && (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              {isManager && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/staff-logs')}
+                  className="text-muted-foreground hover:text-foreground"
+                  title="Staff Logs"
+                >
+                  <Users className="h-4 w-4" />
+                </Button>
+              )}
               <span className="text-sm text-muted-foreground hidden sm:block">
                 {user.email}
               </span>
