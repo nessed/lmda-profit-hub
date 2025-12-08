@@ -217,7 +217,15 @@ export async function deleteOtherCost(id: string) {
 
 // Helper functions
 export function isPaid(paymentStatus: string | null): boolean {
-  return paymentStatus?.toLowerCase().trim() === 'yes';
+  if (!paymentStatus) return false;
+  const lower = paymentStatus.toLowerCase().trim();
+  const plain = lower.replace(/[^a-z0-9 ]+/g, ' ');
+
+  const negative = /(unpaid|not\s*paid|pending|due|outstanding|no\b|false\b|0\b)/;
+  if (negative.test(plain)) return false;
+
+  const positive = /(paid|yes\b|y\b|true\b|done|complete|completed|success|confirm|received|cleared|settled|1\b)/;
+  return positive.test(plain);
 }
 
 export function formatCurrency(amount: number): string {
