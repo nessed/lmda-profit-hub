@@ -17,7 +17,7 @@ export function Navbar() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex h-14 items-center justify-between">
           <Link to="/dashboard" className="font-semibold text-lg text-foreground">
-            LMDA Control
+            At a Glance
           </Link>
 
           {user && (

@@ -158,6 +158,82 @@
     @apply bg-muted text-muted-foreground;
   }
 
+  /* Profit Card styles */
+  .profit-card {
+    @apply bg-card rounded-xl border-2 p-5 transition-all duration-200;
+  }
+
+  .profit-card-positive {
+    @apply border-success/30 shadow-[0_0_20px_-5px_hsl(var(--success)/0.2)];
+  }
+
+  .profit-card-negative {
+    @apply border-destructive/30 shadow-[0_0_20px_-5px_hsl(var(--destructive)/0.2)];
+  }
+
+  .profit-card-neutral {
+    @apply border-border;
+  }
+
+  /* Receipt styles */
+  .receipt {
+    @apply bg-card rounded-xl border border-border shadow-lg max-w-md mx-auto overflow-hidden;
+  }
+
+  .receipt-header {
+    @apply bg-muted/50 px-6 py-4 border-b border-border;
+  }
+
+  .receipt-body {
+    @apply px-6 py-5 space-y-4;
+  }
+
+  .receipt-row {
+    @apply flex justify-between items-center py-2;
+  }
+
+  .receipt-row-positive {
+    @apply text-success;
+  }
+
+  .receipt-row-negative {
+    @apply text-destructive;
+  }
+
+  .receipt-divider {
+    @apply border-t border-dashed border-border my-3;
+  }
+
+  .receipt-total {
+    @apply flex justify-between items-center py-3 text-lg font-bold;
+  }
+
+  /* Margin bar */
+  .margin-bar {
+    @apply h-2 w-full bg-muted rounded-full overflow-hidden;
+  }
+
+  .margin-bar-fill {
+    @apply h-full bg-success rounded-full transition-all duration-500;
+  }
+
+  /* Health indicator */
+  .health-dot {
+    @apply w-3 h-3 rounded-full inline-block;
+  }
+
+  .health-dot-green {
+    @apply bg-success;
+  }
+
+  .health-dot-yellow {
+    @apply bg-warning;
+  }
+
+  .health-dot-red {
+    @apply bg-destructive;
+  }
+
   .tab-item {
     @apply px-1 py-2 text-sm font-medium text-muted-foreground border-b-2 border-transparent transition-colors hover:text-foreground;
   }
