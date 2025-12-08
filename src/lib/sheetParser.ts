@@ -9,7 +9,7 @@ export interface ParsedRegistration {
   notes: string | null;
   paymentConfirmed: string | null;
   amountRs: number;
-}
+} //comet
 
 const LOCAL_PROXY_URL = "/api/gsheet";
 const DIRECT_SCRIPT_URL =
